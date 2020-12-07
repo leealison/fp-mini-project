@@ -1,0 +1,5 @@
+(** @canonical Dune__exe.Executable *)
+module Executable = Dune__exe__Executable
+
+(** @canonical Dune__exe.Project *)
+module Project = Dune__exe__Project

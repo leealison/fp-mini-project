@@ -1,0 +1,7 @@
+(executable
+  (name project)
+  (libraries
+    core
+    cohttp
+    lwt
+    cohttp-lwt-unix))
