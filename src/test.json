@@ -1,28 +1,126 @@
 {
-    "type": "menuItem",
-    "menuItems": [
-        {
-            "id": 345700,
-            "title": "Kale-ribbean Breeze",
-            "restaurantChain": "Jamba Juice",
-            "servingSize": "1 Serving",
-            "readableServingSize": "Large",
-            "image": "https://images.spoonacular.com/file/wximages/345700-312x231.png",
-            "imageType": "png"
+    "id": 345700,
+    "title": "Kale-ribbean Breeze",
+    "price": null,
+    "likes": 0.0,
+    "badges": [],
+    "nutrition": {
+        "nutrients": [
+            {
+                "title": "Vitamin A",
+                "amount": 20500.0,
+                "unit": "IU",
+                "percentOfDailyNeeds": 410.0
+            },
+            {
+                "title": "Vitamin C",
+                "amount": 247.5,
+                "unit": "mg",
+                "percentOfDailyNeeds": 300.0
+            },
+            {
+                "title": "Sugar",
+                "amount": 85.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 94.44
+            },
+            {
+                "title": "Net Carbohydrates",
+                "amount": 100.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 36.36
+            },
+            {
+                "title": "Carbohydrates",
+                "amount": 108.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 36.0
+            },
+            {
+                "title": "Fiber",
+                "amount": 8.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 32.0
+            },
+            {
+                "title": "Calcium",
+                "amount": 300.0,
+                "unit": "mg",
+                "percentOfDailyNeeds": 30.0
+            },
+            {
+                "title": "Calories",
+                "amount": 500.0,
+                "unit": "kcal",
+                "percentOfDailyNeeds": 25.0
+            },
+            {
+                "title": "Protein",
+                "amount": 11.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 22.0
+            },
+            {
+                "title": "Iron",
+                "amount": 2.7,
+                "unit": "mg",
+                "percentOfDailyNeeds": 15.0
+            },
+            {
+                "title": "Fat",
+                "amount": 3.5,
+                "unit": "g",
+                "percentOfDailyNeeds": 5.38
+            },
+            {
+                "title": "Sodium",
+                "amount": 90.0,
+                "unit": "mg",
+                "percentOfDailyNeeds": 3.91
+            },
+            {
+                "title": "Cholesterol",
+                "amount": 0.0,
+                "unit": "mg",
+                "percentOfDailyNeeds": 0.0
+            },
+            {
+                "title": "Saturated Fat",
+                "amount": 0.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 0.0
+            },
+            {
+                "title": "Trans Fat",
+                "amount": 0.0,
+                "unit": "g",
+                "percentOfDailyNeeds": 0.0
+            }
+        ],
+        "caloricBreakdown": {
+            "percentProtein": 8.67,
+            "percentFat": 6.21,
+            "percentCarbs": 85.12
         },
-        {
-            "id": 345702,
-            "title": "Kale-ribbean Breeze",
-            "restaurantChain": "Jamba Juice",
-            "servingSize": "1 Serving",
-            "readableServingSize": "Small",
-            "image": "https://images.spoonacular.com/file/wximages/345702-312x231.ashx",
-            "imageType": "ashx"
-        }
+        "calories": 500.0,
+        "fat": "3.5g",
+        "protein": "11g",
+        "carbs": "108g"
+    },
+    "servingSize": null,
+    "readableServingSize": "Large",
+    "numberOfServings": 1.0,
+    "spoonacularScore": null,
+    "breadcrumbs": [
+        "breeze",
+        "beverage"
     ],
-    "offset": 0,
-    "number": 2,
-    "totalMenuItems": 62,
-    "processingTimeMs": 3,
-    "expires": 1608345487489
+    "imageType": "png",
+    "generatedText": null,
+    "restaurantChain": "Jamba Juice",
+    "images": [
+        "https://images.spoonacular.com/file/wximages/345700-90x90.png",
+        "https://images.spoonacular.com/file/wximages/345700-312x231.png",
+        "https://images.spoonacular.com/file/wximages/345700-636x393.png"
+    ]
 }
