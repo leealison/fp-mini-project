@@ -3,5 +3,11 @@
   (libraries
     core
     cohttp
-    lwt
-    cohttp-lwt-unix))
+    async
+    cohttp-async
+    textwrap
+    yojson
+    ppx_deriving_yojson.runtime)
+  (preprocess
+    (pps ppx_deriving_yojson
+    ppx_let)))

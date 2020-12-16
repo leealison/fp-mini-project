@@ -1,0 +1,28 @@
+{
+    "type": "menuItem",
+    "menuItems": [
+        {
+            "id": 345700,
+            "title": "Kale-ribbean Breeze",
+            "restaurantChain": "Jamba Juice",
+            "servingSize": "1 Serving",
+            "readableServingSize": "Large",
+            "image": "https://images.spoonacular.com/file/wximages/345700-312x231.png",
+            "imageType": "png"
+        },
+        {
+            "id": 345702,
+            "title": "Kale-ribbean Breeze",
+            "restaurantChain": "Jamba Juice",
+            "servingSize": "1 Serving",
+            "readableServingSize": "Small",
+            "image": "https://images.spoonacular.com/file/wximages/345702-312x231.ashx",
+            "imageType": "ashx"
+        }
+    ],
+    "offset": 0,
+    "number": 2,
+    "totalMenuItems": 62,
+    "processingTimeMs": 3,
+    "expires": 1608345487489
+}
