@@ -5,7 +5,6 @@
     cohttp
     async
     cohttp-async
-    textwrap
     yojson
     ppx_deriving_yojson.runtime)
   (preprocess
