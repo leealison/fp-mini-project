@@ -16,7 +16,7 @@ type meal = nutrition list
 
 (*exception Restaurant_not_found of string*)
 
-let api_key = "ac48df297c634f96a452c8a246a4998f"
+let api_key = "34d836ce58a34b8389fef681402b9e4a"
 let search_base_url =
   Uri.of_string "https://api.spoonacular.com/food/menuItems/search"
 let info_base_url = "https://api.spoonacular.com/food/menuItems"
@@ -59,7 +59,7 @@ module Menu (Random: Randomness) = struct
         json |> Util.to_list |> Util.filter_assoc |> List.nth_exn in
       let first_object = items 0 in
       let restaurant_field =
-        List.nth_exn first_object 2 |> Core.snd |> to_string |> sanitize in
+        List.nth_exn first_object 2 |> snd |> to_string |> sanitize in
       if String.compare restaurant restaurant_field = 0 then true
       else true
 
@@ -147,44 +147,56 @@ module Meal = struct
         then return(new_meal)
         else generate_meal ids new_meal limit new_calorie_sum length 1
 
-  let rec get_macro macros macro =
+  let rec get_macro_info macros macro =
     match macros with
-    | [] -> -1.
+    | [] -> (-1., "", -1.)
     | { nutrient = x; numbers = y } :: tail ->
-      if String.compare macro x = 0 then Core.fst3 y
-      else get_macro tail macro
-
-  let rec get_unit macros macro =
-    match macros with
-    | [] -> ""
-    | { nutrient = x; numbers = y } :: tail ->
-      if String.compare macro x = 0 then Core.snd3 y
-      else get_unit tail macro
+      if String.compare macro x = 0 then (fst3 y, snd3 y, trd3 y)
+      else get_macro_info tail macro
 
   (*let rec print_macros macro =
     match macro with
     | []-> printf ""
     | {nutrient = x; numbers= _} :: tail -> printf "%s\n" x;
-      print_macros tail*)
+      print_macros tail printf "Total:\n%d calories\n" total_cals *)
+end
 
-  let rec print_meal meal number total_cals macros =
+let print_totals (meal: meal) macros_to_print =
+  let module Meal = Meal in
+  let rec get_stats_for_one_macro meal macro_to_get prev =
     match meal with
-    | [] -> printf "Total:\n%d calories\n" total_cals
+    | [] -> prev
+    | {name = _; info = x} :: tail ->
+      let info = Meal.get_macro_info x macro_to_get in
+      let amount = (fst3 info) +. (fst3 prev) in
+      let unit = snd3 info in
+      let dv = (trd3 info) +. (trd3 prev) in
+      get_stats_for_one_macro tail macro_to_get (amount, unit, dv) in
+  printf "Total:\n";
+  List.iter macros_to_print ~f:(fun x ->
+    let total = get_stats_for_one_macro meal x (0., "", 0.) in
+    printf "%.5g%s %s, %.2g%% DV\n" (fst3 total) (snd3 total) (String.lowercase x)
+      (trd3 total)
+  )
+
+let print_meal meal number macros_to_print =
+  let rec aux meal number macros_to_print =
+    match meal with
+    | [] -> ()
     | { name = x; info = y } :: tail ->
-      let calories = get_macro y "Calories" |> Float.to_int in
-      printf "%d. %s " number x;
-      printf "(%d calories" calories;
-      List.iter macros ~f:(fun x ->
-          let amount = get_macro y x in
-          let unit = get_unit y x in
-          if Float.(>=) amount 0.
-          then printf ", %.2g%s %s" amount unit (String.lowercase x)
+      let module Meal = Meal in
+      printf "%d. %s\n" number x;
+      List.iter macros_to_print ~f:(fun x ->
+          let macro_info = Meal.get_macro_info y x in
+          if Float.(>=) (fst3 macro_info) 0.
+          then printf "    %.4g%s %s\n"
+            (fst3 macro_info) (snd3 macro_info) (String.lowercase x)
           else printf ""
         );
-      printf ")\n";
-      let total_cals = total_cals + calories in
-      print_meal tail (number + 1) total_cals macros;;
-end
+      printf "\n";
+      aux tail (number + 1) macros_to_print in
+  aux meal number macros_to_print;
+  print_totals meal macros_to_print
 
 let make_and_print restaurant calories macros =
   let module Menu = Menu (Randomness) in
@@ -192,8 +204,9 @@ let make_and_print restaurant calories macros =
   let%bind ids = Menu.fetch_menu restaurant in
   let%bind meal = Meal.generate_meal ids [] calories 0. (List.length ids) 1 in
   printf "\n";
+  (* If calorie limit was too low: *)
   if List.length meal = 0 then return @@ printf "No meals found for this calorie limit.\n"
-  else return @@ Meal.print_meal meal 1 0 macros
+  else return @@ print_meal meal 1 macros
 
 let () =
   Command.async ~summary:"Generate meals at restaurants."
@@ -204,6 +217,7 @@ let () =
       and macros = anon (sequence ("word" %: string)) in
       fun () ->
         let calories = Int.to_float calories in
+        let macros = "Calories" :: macros in
         make_and_print restaurant calories macros)
   |> Command.run
 
