@@ -16,22 +16,17 @@ type meal = nutrition list
 
 exception Macro_not_available of unit
 exception Restaurant_not_available of string
-exception API_limit_reached of Yojson.Safe.t
+exception API_limit_reached of string
 
-let api_key = "d6db19859c1e4576ba5a70a0748e0398"
+let api_key = "34d836ce58a34b8389fef681402b9e4a"
 let search_base_url =
   Uri.of_string "https://api.spoonacular.com/food/menuItems/search"
 let info_base_url = "https://api.spoonacular.com/food/menuItems"
-let num_of_menu_items_to_generate = "10"
+let num_of_menu_items_to_generate = "1"
 
-let remove_quotation_marks word =
+let sanitize word =
   let word = String.drop_prefix word 1 in
   String.drop_suffix word 1
-
-let check_json json =
-  match json with
-  | Ok x -> x
-  | Error _ -> raise (Failure "API limit reached, provide a new API key!")
 
 module type Randomness = sig
   val int : int -> int
@@ -43,49 +38,41 @@ module Randomness = struct
 end
 
 module type Menu = sig
-  val get_menu_from_json: string -> (Yojson.Safe.t, Yojson.Safe.t) result
-  val check_response: string * string -> string
-  val get_id_list: string -> (int list, 'a list) result
-  val fetch_menu: string -> string Deferred.t
+  val get_menu_from_json: string -> Yojson.Safe.t
+  val check_response: string * string -> bool
+  val get_id_list: string -> int list
+  val fetch_menu: string -> int list Deferred.t
   val fetch_menu_item: int -> Yojson.Safe.t Deferred.t
 end
 
 module Menu (Random: Randomness) = struct
   let get_menu_from_json json =
-    try (
-      let json_menu = Util.to_assoc @@ from_string json in
-      match List.Assoc.find ~equal:String.equal json_menu "menuItems" with
-      | None -> raise (API_limit_reached (from_string "{\"exn\": \"error\"}"))
-      | Some x -> Ok x
-    ) with (API_limit_reached t) -> Error t
+    let json_menu = Util.to_assoc @@ from_string json in
+    match List.Assoc.find ~equal:String.equal json_menu "menuItems" with
+    | None -> failwith "Unexpected response, could not find menuItems field!"
+    | Some x -> x
 
   let check_response (restaurant, menu) =
     let json = get_menu_from_json menu in
-    try (
-      let json = check_json json in
-      let items_string = Yojson.Safe.to_string @@ json in
-      if String.length items_string <= 2 then
-        raise (Restaurant_not_available (restaurant ^ " is not available."))
+    let items_string = Yojson.Safe.to_string json in
+    if String.length items_string <= 2 then
+      raise (Restaurant_not_available
+               (restaurant ^ "is not available. Pick a different one!"))
+    else
+      let items =
+        json |> Util.to_list |> Util.filter_assoc |> List.nth_exn in
+      let first_object = items 0 in
+      let restaurant_field =
+        List.nth_exn first_object 2 |> snd |> to_string |> sanitize in
+      if String.compare restaurant restaurant_field = 0 then true
       else
-        let items =
-          json |> Util.to_list |> Util.filter_assoc |> List.nth_exn in
-        let first_object = items 0 in
-        let restaurant_field =
-          List.nth_exn first_object 2 |> snd |> to_string
-          |> remove_quotation_marks in
-        if String.compare restaurant restaurant_field = 0 then menu
-        else
-          raise (Restaurant_not_available (restaurant ^ " is not available."))
-    ) with
-    | Failure msg -> raise (Failure msg)
-    | Restaurant_not_available msg -> raise (Restaurant_not_available msg)
+        raise (Restaurant_not_available
+                 (restaurant ^ "is not available. Pick a different one!"))
 
   let get_id_list menu_items =
-    try (
-      let json = get_menu_from_json menu_items |> check_json in
-      let id_json_list = Util.filter_member "id" @@ Util.to_list json in
-      Ok (List.map id_json_list ~f:Util.to_int)
-    ) with API_limit_reached _ -> Error []
+    let json = get_menu_from_json menu_items in
+    let id_json_list = Util.filter_member "id" @@ Util.to_list json in
+    List.map id_json_list ~f:Util.to_int
 
   let fetch_menu restaurant =
     let url = Uri.add_query_params' search_base_url
@@ -94,11 +81,20 @@ module Menu (Random: Randomness) = struct
          ("number", num_of_menu_items_to_generate)] in
     Cohttp_async.Client.get url >>= fun (_, body) ->
     Cohttp_async.Body.to_string body >>| fun menu_string ->
-    try (
-      check_response (restaurant, menu_string)
-    ) with
-    | Restaurant_not_available x -> "Exception: " ^ x
-    | Failure x -> "Exception: " ^ x
+    if check_response (restaurant, menu_string) then
+      get_id_list menu_string
+    else failwith "check_response returned false"
+
+    (*
+    let get_definition ~server word =
+  try_with (fun () ->
+      Cohttp_async.Client.get (query_uri ~server word) >>= fun (_, body) ->
+      Cohttp_async.Body.to_string body >>| fun string ->
+      (word, get_definition_from_json string))
+  >>| function
+  | Ok (word, result) -> (word, Ok result)
+  | Error _ -> (word, Error "Unexpected failure")
+    *)
 
   let fetch_menu_item id =
     let base_url = info_base_url ^ "/" ^ (Int.to_string id)
@@ -115,7 +111,8 @@ module type Meal = sig
   val calorie_overflow: Yojson.Safe.t -> float -> float -> float
   val generate_meal: int list -> nutrition list -> float -> int
     -> int -> nutrition list Deferred.t
-  val get_macro_info: macros list -> string -> float * string * float
+  val get_macro: macros list -> string -> float
+  val print_meal: meal -> int -> int -> string list -> unit
 end
 
 module Meal = struct
@@ -188,14 +185,14 @@ let print_totals (meal: meal) macros_to_print =
       else raise (Macro_not_available ()) in
   printf "Total:\n";
   List.iter macros_to_print ~f:(fun x ->
-    try (
-      let total = get_stats_for_one_macro meal x (0., "", 0.) in
-      if String.(=) x "Calories" then printf "%.5g%s, %.2g%% DV\n"
-          (fst3 total) (snd3 total) (trd3 total)
-      else printf "%.5g%s %s, %.4g%% DV\n"
-          (fst3 total) (snd3 total) (String.lowercase x) (trd3 total)
-    ) with Macro_not_available () -> printf "";
-  )
+      try (
+        let total = get_stats_for_one_macro meal x (0., "", 0.) in
+        if String.(=) x "Calories" then printf "%.5g%s, %.2g%% DV\n"
+            (fst3 total) (snd3 total) (trd3 total)
+        else printf "%.5g%s %s, %.2g%% DV\n"
+            (fst3 total) (snd3 total) (String.lowercase x) (trd3 total)
+      ) with Macro_not_available () -> printf "";
+    )
 
 let print_meal meal number macros_to_print =
   let rec aux meal number macros_to_print =
@@ -221,21 +218,13 @@ let print_meal meal number macros_to_print =
 let make_and_print restaurant calories macros =
   let module Menu = Menu (Randomness) in
   let module Meal = Meal in
-  let%bind menu_string = Menu.fetch_menu restaurant in
-  if String.is_substring menu_string ~substring:"Exception"
-  then return @@ print_endline menu_string
-  else
-    let get_result result =
-      match result with
-      | Ok x -> x
-      | Error _ -> raise (Failure "asdf") in
-    let ids = Menu.get_id_list menu_string |> get_result in
-    let%bind meal = Meal.generate_meal ids [] calories 0. (List.length ids) 1 in
-    printf "\n";
-    (* If calorie limit was too low: *)
-    if List.length meal = 0 then
-      return @@ printf "No meals found for this calorie limit.\n"
-    else return @@ print_meal meal 1 macros
+  let%bind ids = Menu.fetch_menu restaurant in
+  let%bind meal = Meal.generate_meal ids [] calories 0. (List.length ids) 1 in
+  printf "\n";
+  (* If calorie limit was too low: *)
+  if List.length meal = 0 then
+    return @@ printf "No meals found for this calorie limit.\n"
+  else return @@ print_meal meal 1 macros
 
 let () =
   Command.async ~summary:"Generate meals at restaurants."
