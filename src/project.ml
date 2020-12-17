@@ -14,7 +14,7 @@ type nutrition = {
 
 type meal = nutrition list
 
-(*exception Restaurant_not_found of string*)
+exception Macro_not_available of unit
 
 let api_key = "34d836ce58a34b8389fef681402b9e4a"
 let search_base_url =
@@ -149,7 +149,7 @@ module Meal = struct
 
   let rec get_macro_info macros macro =
     match macros with
-    | [] -> (-1., "", -1.)
+    | [] -> raise (Macro_not_available ())
     | { nutrient = x; numbers = y } :: tail ->
       if String.compare macro x = 0 then (fst3 y, snd3 y, trd3 y)
       else get_macro_info tail macro
@@ -168,16 +168,19 @@ let print_totals (meal: meal) macros_to_print =
     | [] -> prev
     | {name = _; info = x} :: tail ->
       let info = Meal.get_macro_info x macro_to_get in
-      let amount = (fst3 info) +. (fst3 prev) in
-      let unit = snd3 info in
-      let dv = (trd3 info) +. (trd3 prev) in
-      get_stats_for_one_macro tail macro_to_get (amount, unit, dv) in
+      if Float.(>=) (fst3 info) 0. then
+        get_stats_for_one_macro tail macro_to_get
+          ((fst3 info) +. (fst3 prev), (snd3 info), (trd3 info) +. (trd3 prev))
+      else raise (Macro_not_available ()) in
   printf "Total:\n";
   List.iter macros_to_print ~f:(fun x ->
-    let total = get_stats_for_one_macro meal x (0., "", 0.) in
-    printf "%.5g%s %s, %.2g%% DV\n" (fst3 total) (snd3 total) (String.lowercase x)
-      (trd3 total)
-  )
+      try (
+        let total = get_stats_for_one_macro meal x (0., "", 0.) in
+        printf "%.5g%s %s, %.2g%% DV\n"
+          (fst3 total) (snd3 total) (String.lowercase x)
+          (trd3 total)
+      ) with Macro_not_available () -> printf "";
+    )
 
 let print_meal meal number macros_to_print =
   let rec aux meal number macros_to_print =
@@ -187,11 +190,11 @@ let print_meal meal number macros_to_print =
       let module Meal = Meal in
       printf "%d. %s\n" number x;
       List.iter macros_to_print ~f:(fun x ->
-          let macro_info = Meal.get_macro_info y x in
-          if Float.(>=) (fst3 macro_info) 0.
-          then printf "    %.4g%s %s\n"
-            (fst3 macro_info) (snd3 macro_info) (String.lowercase x)
-          else printf ""
+          try (
+            let macro_info = Meal.get_macro_info y x in
+            printf "    %.4g%s %s\n"
+              (fst3 macro_info) (snd3 macro_info) (String.lowercase x)
+          ) with Macro_not_available () -> printf ""
         );
       printf "\n";
       aux tail (number + 1) macros_to_print in
