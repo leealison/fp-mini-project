@@ -3,29 +3,30 @@ open Async
 open Yojson.Safe
 
 type macros = {
-  nutrient: string; (* calories, fiber, protein, etc. *)
-  numbers: (float * string * float) (* amount, unit, DV% *)
+  nutrient: string;
+  numbers: (float * string * float)
 }
 
 type nutrition = {
-  name: string; (* food name *)
+  name: string;
   info: macros list
 }
 
 type meal = nutrition list
 
+exception Restaurant_not_found of string
+
 let api_key = "ab38d331e24945d581fe7f0cb68a1e84"
 let search_base_url =
   Uri.of_string "https://api.spoonacular.com/food/menuItems/search"
 let info_base_url = "https://api.spoonacular.com/food/menuItems"
+let num_of_menu_items_to_generate = "1"
 
 let sanitize word =
   let word = String.drop_prefix word 1 in
   String.drop_suffix word 1
 
 module type Randomness = sig
-  (*  Given a maximum integer value, return a pseudorandom integer
-      from 0 (inclusive) to this value (exclusive). *)
   val int : int -> int
 end
 
@@ -72,12 +73,12 @@ module Menu (Random: Randomness) = struct
     let url = Uri.add_query_params' search_base_url
         [("apiKey", api_key);
          ("query", restaurant);
-         ("number", "10")] in
+         ("number", num_of_menu_items_to_generate)] in
     Cohttp_async.Client.get url >>= fun (_, body) ->
     Cohttp_async.Body.to_string body >>| fun menu_string ->
     if check_response (restaurant, menu_string) then
       get_id_list menu_string
-    else failwith "check_response returned false"
+    else raise (Restaurant_not_found "check_response returned false")
 
   let fetch_menu_item id =
     let base_url = info_base_url ^ "/" ^ (Int.to_string id)
@@ -93,7 +94,7 @@ module type Meal = sig
   val make_new_macro: Yojson.Safe.t -> macros
   val add: t -> Yojson.Safe.t -> t
   val calorie_overflow: Yojson.Safe.t -> float -> float -> float
-  val generate_meal: int list -> nutrition list -> float -> float
+  val generate_meal: int list -> nutrition list -> float -> int
     -> int -> nutrition list Deferred.t
   val get_macro: macros list -> string -> float
   val print_meal: t -> int -> int -> unit
@@ -134,18 +135,20 @@ module Meal = struct
     if Float.compare sum (limit +. 100.) > 0
     then -1. else item_calories
 
-  let rec generate_meal ids meal limit calorie_sum length =
-    let id = List.nth_exn ids @@ Random.int length in
-    let%bind menu_item= Menu.fetch_menu_item id in
-    let item_calories = calorie_overflow menu_item calorie_sum limit in
-    if Float.(=) item_calories (-1.)
-    then return meal
+  let rec generate_meal ids meal limit calorie_sum length counter =
+    if counter = 10 then return meal
     else
-      let new_meal = add meal menu_item in
-      let new_calorie_sum = calorie_sum +. item_calories in
-      if Float.(>) new_calorie_sum (limit -. 100.)
-      then return(new_meal)
-      else generate_meal ids new_meal limit new_calorie_sum length
+      let id = List.nth_exn ids @@ Random.int length in
+      let%bind menu_item= Menu.fetch_menu_item id in
+      let item_calories = calorie_overflow menu_item calorie_sum limit in
+      if Float.(=) item_calories (-1.)
+      then generate_meal ids meal limit calorie_sum length (counter + 1)
+      else
+        let new_meal = add meal menu_item in
+        let new_calorie_sum = calorie_sum +. item_calories in
+        if Float.(>) new_calorie_sum limit
+        then return(new_meal)
+        else generate_meal ids new_meal limit new_calorie_sum length 1
 
   let rec get_macro macros macro =
     match macros with
@@ -168,10 +171,14 @@ end
 let make_and_print restaurant calories =
   let module Menu = Menu (Randomness) in
   let module Meal = Meal in
-  let%bind ids = Menu.fetch_menu restaurant in
-  let%bind meal = Meal.generate_meal ids [] calories 0. (List.length ids) in
-  printf "\n";
-  return @@ Meal.print_meal meal 1 0
+  try (
+    let%bind ids = Menu.fetch_menu restaurant in
+    let%bind meal = Meal.generate_meal ids [] calories 0. (List.length ids) 1 in
+    printf "\n";
+    return @@ Meal.print_meal meal 1 0)
+  with err ->
+    let msg = Exn.to_string err in
+    return @@ printf "Errorasdfasdfasdf: %s\n" msg
 
 let () =
   Command.async ~summary:"Generate meals at restaurants."

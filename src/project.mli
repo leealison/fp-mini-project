@@ -77,9 +77,13 @@ module type Meal = sig
   val calorie_overflow: Yojson.Safe.t -> float -> float -> float
 
   (*  Randomly pick an id from the id list and add it to the meal if
-      adding it still maintains the calorie limit.  *)
-  val generate_meal: int list -> nutrition list -> float -> float
-    -> int -> nutrition list Async_kernel.Deferred.t
+      adding it still maintains the calorie limit. In order to get
+      as close to the limit as possible, if calorie_overflow indicates
+      that the current menu item would make the meal exceed the limit,
+      we skip the item and try another one. If an appropriate menu
+      item can't be found in 10 tries, we just return the meal. *)
+  val generate_meal: int list -> nutrition list -> float ->
+    int -> int -> nutrition list Async_kernel.Deferred.t
 
   (*  Get the given macro amount from the macro list.  *)
   val get_macro: macros list -> string -> float
